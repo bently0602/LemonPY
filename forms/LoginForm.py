@@ -45,7 +45,7 @@ class LoginForm(Form):
 		if self["password"].value == "":
 			return
 
-		is_valid_login = users.check_password(
+		is_valid_login = USERS.check_password(
 			self["username"].value,
 			self["password"].value,
 		)
