@@ -5,4 +5,4 @@ REM set http_proxy=socks5://127.0.0.1:1337
 REM set https_proxy=socks5://127.0.0.1:1337
 
 taskkill /f /im python.exe
-python Main.py
+python LEMON.py

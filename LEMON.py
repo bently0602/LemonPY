@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import uuid
 import secrets
 import sys
@@ -11,6 +12,7 @@ import sqlite3
 import math
 from passlib.hash import pbkdf2_sha256
 from expiringdict import ExpiringDict
+import signal
 
 SESSIONCONNECTION = "session.db"
 
@@ -491,3 +493,30 @@ class Users():
 			return res
 
 USERS = Users()
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("-a", "--assertdefaultadmin", type=bool, help="assert default admin user", default=True)
+parser.add_argument("-p", "--port", type=int, help="port that LEMON listens on", default=8090)
+parser.add_argument("-c", "--cookiesecret", help="cookie secret", default="__this_is_A_secret__I_tInk__")
+parser.add_argument("-f", "--forms", help="location of forms", default="forms")
+# https://docs.python.org/3/howto/argparse.html
+
+args = parser.parse_args()
+
+if args.assertdefaultadmin:
+	USERS.assert_default_admin_user()
+
+if __name__ == '__main__':
+	form_server = TornadoServer(
+		[
+			(r".*", FormsServerHandler, {"forms_path": args.forms}),
+		], 
+		cookie_secret=args.cookiesecret,
+		port = args.port
+	)
+	signal.signal(signal.SIGINT, form_server.signal_handler)
+	form_server.start()
+	print("Server @ " + str(form_server.port) + ". Ctrl_Break(Clear)/Ctrl_C to exit!")
+	tornado.ioloop.PeriodicCallback(form_server.try_exit, 1000).start()
+	form_server.block()
