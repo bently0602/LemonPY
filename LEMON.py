@@ -496,16 +496,17 @@ USERS = Users()
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-a", "--assertdefaultadmin", type=bool, help="assert default admin user", default=True)
+parser.add_argument("-a", "--assertdefaultadmin", help="assert default admin user", default="")
 parser.add_argument("-p", "--port", type=int, help="port that LEMON listens on", default=8090)
 parser.add_argument("-c", "--cookiesecret", help="cookie secret", default="__this_is_A_secret__I_tInk__")
 parser.add_argument("-f", "--forms", help="location of forms", default="forms")
+parser.add_argument("-s", "--sql", help="location of sql scripts", default="sql")
 # https://docs.python.org/3/howto/argparse.html
 
 args = parser.parse_args()
 
-if args.assertdefaultadmin:
-	USERS.assert_default_admin_user()
+if args.assertdefaultadmin != "":
+	USERS.assert_default_admin_user(args.assertdefaultadmin)
 
 if __name__ == '__main__':
 	form_server = TornadoServer(
