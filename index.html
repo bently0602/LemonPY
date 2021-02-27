@@ -11,3 +11,11 @@ curl -o ./LEMON.py https://raw.githubusercontent.com/bently0602/LEMON/master/LEM
 curl -o ./LEMON.html https://raw.githubusercontent.com/bently0602/LEMON/master/LEMON.html
 curl -o ./run.bat https://raw.githubusercontent.com/bently0602/LEMON/master/run.bat
 curl -o ./run.sh https://raw.githubusercontent.com/bently0602/LEMON/master/run.sh
+
+FORMSDIR="./forms"
+if [ -d "$FORMSDIR" ]; then
+	mkdir -p ./forms
+	curl -o ./forms/LoginForm.py https://raw.githubusercontent.com/bently0602/LEMON/master/forms/LoginForm.py
+	curl -o ./forms/ErrorForm.py https://raw.githubusercontent.com/bently0602/LEMON/master/forms/ErrorForm.py
+	curl -o ./forms/IndexForm.py https://raw.githubusercontent.com/bently0602/LEMON/master/forms/IndexForm.py
+fi
