@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import uuid
+import string
 import secrets
 import sys
 import tornado.ioloop
@@ -13,13 +14,13 @@ import math
 from passlib.hash import pbkdf2_sha256
 from expiringdict import ExpiringDict
 import signal
+import os
+from pyngrok import ngrok
 
-SESSIONCONNECTION = "session.db"
-
-if 'cache' not in globals():
-	print("Creating in memory cache...")
-	globals()["CACHE"] = ExpiringDict(max_len=100, max_age_seconds=86400)
-
+DATAFOLDER = os.getcwd()
+FORMSFOLDER = os.path.join(os.getcwd(), "forms")
+SESSIONCONNECTION = os.path.join(DATAFOLDER, "session.db")
+print(FORMSFOLDER)
 FORM_TEMPLATE_STR = ""
 with open('./LEMON.html', 'r') as file:
 	FORM_TEMPLATE_STR = file.read()
@@ -414,7 +415,7 @@ class TornadoServer():
 
 class DB():
 	def __init__(self, dbname):
-		self.filename = dbname + ".db"
+		self.filename = os.path.join(DATAFOLDER, dbname + ".db")
 		conn = sqlite3.connect(self.filename)
 		conn.commit()
 		conn.close()
@@ -467,12 +468,14 @@ class Users():
 
 	def assert_default_admin_user(self, password="password"):
 		user = self.users_db.select("select name from users where name = ?", ("admin",))
+		hashed = pbkdf2_sha256.hash(password, rounds=200000, salt_size=16)
 		if len(user) == 0:
-			hashed = pbkdf2_sha256.encrypt(password, rounds=200000, salt_size=16)
 			self.users_db.execute("insert into users (name, hash, attempts) values (?, ?, 0)", ("admin", hashed,))
+		else:
+			self.users_db.execute("update users set hash = ?, attempts = 0 where name = ?", (hashed, "admin"))
 
 	def change_user_password(self, username, password):
-		hashed = pbkdf2_sha256.encrypt(password, rounds=200000, salt_size=16)
+		hashed = pbkdf2_sha256.hash(password, rounds=200000, salt_size=16)
 		self.users_db.execute("update users set hash = ? where name = ?", (hashed, username,))		
 
 	def check_password(self, username, password):
@@ -499,25 +502,60 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-a", "--assertdefaultadmin", help="assert default admin user", default="")
 parser.add_argument("-p", "--port", type=int, help="port that LEMON listens on", default=8090)
 parser.add_argument("-c", "--cookiesecret", help="cookie secret", default="__this_is_A_secret__I_tInk__")
-parser.add_argument("-f", "--forms", help="location of forms", default="forms")
+parser.add_argument("-f", "--forms", help="location of forms", required=False, type=os.path.abspath)
 parser.add_argument("-s", "--sql", help="location of sql scripts", default="sql")
-# https://docs.python.org/3/howto/argparse.html
-
+parser.add_argument("-d", "--data", help="location of data files", required=False, type=os.path.abspath)
+parser.add_argument("-n", "--ngrok", help="is ngrok enabled (or what key)", action="store_true")
+parser.add_argument("-nt", "--ngroktoken", help="ngrok API token", default="")
 args = parser.parse_args()
 
-if args.assertdefaultadmin != "":
-	USERS.assert_default_admin_user(args.assertdefaultadmin)
+print("LemonPY starting")
+
+if args.data != "":
+	DATAFOLDER = args.data
+	print("Using " + DATAFOLDER + " as data path")
+
+if args.forms != "":
+	FORMSFOLDER = args.forms
+	print("Using " + FORMSFOLDER + " as forms path")
 
 if __name__ == '__main__':
+	if args.assertdefaultadmin != "":
+		USERS.assert_default_admin_user(args.assertdefaultadmin)
+		print("Using supplied admin password")
+
+	if args.assertdefaultadmin == "":
+		alphabet = string.ascii_letters + string.digits
+		password = ''.join(secrets.choice(alphabet) for i in range(20))
+		USERS.assert_default_admin_user(password)
+		print("Using generated admin password '" + password + "'")
+
+	ngrok_tunnel = None
+	if args.ngrok:
+		if args.ngroktoken != "":
+			ngrok.set_auth_token(args.ngroktoken)
+		ngrok_tunnel = ngrok.connect(args.port, "http")	
+	
 	form_server = TornadoServer(
 		[
-			(r".*", FormsServerHandler, {"forms_path": args.forms}),
+			(r".*", FormsServerHandler, {"forms_path": FORMSFOLDER}),
 		], 
-		cookie_secret=args.cookiesecret,
+		cookie_secret = args.cookiesecret,
 		port = args.port
 	)
 	signal.signal(signal.SIGINT, form_server.signal_handler)
 	form_server.start()
-	print("Server @ " + str(form_server.port) + ". Ctrl_Break(Clear)/Ctrl_C to exit!")
+	
+	if args.ngrok:
+		print("NGROK URI: " + str(ngrok_tunnel.uri))
+		print("NGROK Public URL: " + str(ngrok_tunnel.public_url))
+
+	print("Server Local: localhost:" + str(form_server.port))
+	print("Ctrl_Break(Clear)/Ctrl_C to exit!")
+
 	tornado.ioloop.PeriodicCallback(form_server.try_exit, 1000).start()
 	form_server.block()
+
+	if ngrok_tunnel != None:
+		ngrok.disconnect(ngrok_tunnel.public_url)
+	
