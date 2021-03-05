@@ -555,9 +555,9 @@ if __name__ == '__main__':
 	
 	if args.ngrok:
 		print("NGROK URI: " + str(ngrok_tunnel.uri))
-		print("NGROK Public URL: " + str(ngrok_tunnel.public_url))
+		print("NGROK Public URL (or https): " + str(ngrok_tunnel.public_url))
 
-	print("Server Local: localhost:" + str(form_server.port))
+	print("Server Local: http://localhost:" + str(form_server.port))
 	print("Ctrl_Break(Clear)/Ctrl_C to exit!")
 
 	tornado.ioloop.PeriodicCallback(form_server.try_exit, 1000).start()
