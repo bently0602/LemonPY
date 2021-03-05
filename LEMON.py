@@ -12,19 +12,15 @@ from tornado import template
 import sqlite3
 import math
 from passlib.hash import pbkdf2_sha256
-from expiringdict import ExpiringDict
 import signal
 import os
 from pyngrok import ngrok
+from pathlib import Path
 
-DATAFOLDER = os.getcwd()
-FORMSFOLDER = os.path.join(os.getcwd(), "forms")
-SESSIONCONNECTION = os.path.join(DATAFOLDER, "session.db")
-print(FORMSFOLDER)
 FORM_TEMPLATE_STR = ""
-with open('./LEMON.html', 'r') as file:
+FORM_TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "LEMON.html")
+with open(FORM_TEMPLATE_PATH, 'r') as file:
 	FORM_TEMPLATE_STR = file.read()
-
 FORM_TEMPLATE = template.Template(FORM_TEMPLATE_STR)
 
 class Colors():
@@ -222,15 +218,17 @@ class Form():
 		pass
 
 class FormsServerHandler(tornado.web.RequestHandler):
-	def initialize(self, forms_path):
+	def initialize(self):
 		form_name = self.request.path.split("/")[-1]
 		if form_name == "":
 			form_name = "Index"
 		try:
-			exec(open("./" + forms_path + "/" + form_name + "Form.py").read(), globals())
+			form_path = os.path.join(FORMSFOLDER, form_name + "Form.py")
+			exec(open(form_path).read(), globals())
 		except:
 			form_name = "Error"
-			exec(open("./" + forms_path + "/" + form_name + "Form.py").read(), globals())
+			form_path = os.path.join(FORMSFOLDER, form_name + "Form.py")
+			exec(open(form_path).read(), globals())
 		self.form = globals()[form_name + "Form"]()
 		self.form.fields = []
 		self.form.title = "NO TITLE"
@@ -290,9 +288,10 @@ class FormsServerHandler(tornado.web.RequestHandler):
 class SessionCacheKeyValue():
 	def __init__(self, session_id):
 		self.session_id = session_id
+		self.SESSIONCONNECTION = os.path.join(DATAFOLDER, "session.db")
 
 	def __getitem__(self, key):
-		conn = sqlite3.connect(SESSIONCONNECTION)
+		conn = sqlite3.connect(self.SESSIONCONNECTION)
 		c = conn.cursor()
 		c.execute('SELECT value FROM kv WHERE sessionid = ? and key = ?', (self.session_id, key,))
 		item = c.fetchone()
@@ -302,7 +301,7 @@ class SessionCacheKeyValue():
 		return item[0]
 
 	def __setitem__(self, key, value):
-		conn = sqlite3.connect(SESSIONCONNECTION)
+		conn = sqlite3.connect(self.SESSIONCONNECTION)
 		c = conn.cursor()
 		c.execute('REPLACE INTO kv (sessionid, key, value) VALUES (?,?,?)', (self.session_id, key, value))
 		conn.commit()
@@ -310,7 +309,8 @@ class SessionCacheKeyValue():
 
 class SessionCache():
 	def __init__(self):
-		conn = sqlite3.connect(SESSIONCONNECTION)
+		self.SESSIONCONNECTION = os.path.join(DATAFOLDER, "session.db")
+		conn = sqlite3.connect(self.SESSIONCONNECTION)
 		c = conn.cursor()
 		c.execute("CREATE TABLE IF NOT EXISTS kv (sessionid text, key text, value text, UNIQUE(sessionid, key))")
 		conn.commit()
@@ -322,7 +322,7 @@ class SessionCache():
 	def __delitem__(self, session_id):
 		if key not in self:
 			raise KeyError(key)
-		conn = sqlite3.connect(SESSIONCONNECTION)
+		conn = sqlite3.connect(self.SESSIONCONNECTION)
 		c = self.conn.cursor()
 		c.execute('DELETE FROM kv WHERE sessionid = ?', (session_id,))
 		conn.commit()
@@ -495,7 +495,7 @@ class Users():
 				self.users_db.execute("update users set attempts = 0 where name = ?", (username,))
 			return res
 
-USERS = Users()
+############################################################################################################
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -511,22 +511,29 @@ args = parser.parse_args()
 
 print("LemonPY starting")
 
-if args.data != "":
+DATAFOLDER = os.getcwd()
+FORMSFOLDER = os.path.join(os.getcwd(), "forms")
+
+if args.data is not None:
 	DATAFOLDER = args.data
+	Path(DATAFOLDER).mkdir(parents=True, exist_ok=True)
 	print("Using " + DATAFOLDER + " as data path")
 
-if args.forms != "":
+if args.forms is not None:
 	FORMSFOLDER = args.forms
+	Path(FORMSFOLDER).mkdir(parents=True, exist_ok=True)
 	print("Using " + FORMSFOLDER + " as forms path")
 
 if __name__ == '__main__':
+	USERS = Users()
+
 	if args.assertdefaultadmin != "":
 		USERS.assert_default_admin_user(args.assertdefaultadmin)
 		print("Using supplied admin password")
 
 	if args.assertdefaultadmin == "":
 		alphabet = string.ascii_letters + string.digits
-		password = ''.join(secrets.choice(alphabet) for i in range(20))
+		password = ''.join(secrets.choice(alphabet) for i in range(10))
 		USERS.assert_default_admin_user(password)
 		print("Using generated admin password '" + password + "'")
 
@@ -538,7 +545,7 @@ if __name__ == '__main__':
 	
 	form_server = TornadoServer(
 		[
-			(r".*", FormsServerHandler, {"forms_path": FORMSFOLDER}),
+			(r".*", FormsServerHandler),
 		], 
 		cookie_secret = args.cookiesecret,
 		port = args.port
