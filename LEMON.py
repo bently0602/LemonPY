@@ -222,13 +222,17 @@ class FormsServerHandler(tornado.web.RequestHandler):
 		form_name = self.request.path.split("/")[-1]
 		if form_name == "":
 			form_name = "Index"
+		
+		error = None
 		try:
 			form_path = os.path.join(FORMSFOLDER, form_name + "Form.py")
 			exec(open(form_path).read(), globals())
 		except:
 			form_name = "Error"
 			form_path = os.path.join(FORMSFOLDER, form_name + "Form.py")
+			error = sys.exc_info()[0]
 			exec(open(form_path).read(), globals())
+		
 		self.form = globals()[form_name + "Form"]()
 		self.form.fields = []
 		self.form.title = "NO TITLE"
@@ -237,7 +241,8 @@ class FormsServerHandler(tornado.web.RequestHandler):
 		self.form.width = 80
 		self.form.height = 32
 		self.form.session = Session(self)
-
+		self.form.error = error
+		
 	def prepare(self):
 		# https://stackoverflow.com/questions/29794641/tornado-redirect-to-a-different-domain
 		self._init_ret = self.form.init()
