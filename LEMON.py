@@ -508,7 +508,7 @@ parser.add_argument("-a", "--assertdefaultadmin", help="assert default admin use
 parser.add_argument("-p", "--port", type=int, help="port that LEMON listens on", default=8090)
 parser.add_argument("-c", "--cookiesecret", help="cookie secret", default="__this_is_A_secret__I_tInk__")
 parser.add_argument("-f", "--forms", help="location of forms", required=False, type=os.path.abspath)
-parser.add_argument("-s", "--sql", help="location of sql scripts", default="sql")
+#parser.add_argument("-s", "--sql", help="location of sql scripts", default="sql")
 parser.add_argument("-d", "--data", help="location of data files", required=False, type=os.path.abspath)
 parser.add_argument("-n", "--ngrok", help="is ngrok enabled (or what key)", action="store_true")
 parser.add_argument("-nt", "--ngroktoken", help="ngrok API token", default="")
